@@ -1,0 +1,348 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+  companyName   String?
+  phone         String?
+  role          String    @default("user") // user, admin
+  emailVerified Boolean   @default(false)
+  verifyToken   String?
+  resetToken    String?
+  resetTokenExp DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  subscription   Subscription?
+  company        Company?
+  leads          Lead[]
+  blogPosts      BlogPost[]
+  supportTickets SupportTicket[]
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  dotNumber String?
+  mcNumber  String?
+  taxId     String?
+  isDemo    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  trucks       Truck[]
+  drivers      Driver[]
+  customers    Customer[]
+  loads        Load[]
+  invoices     Invoice[]
+  fuelExpenses FuelExpense[]
+  maintenance  MaintenanceRecord[]
+  documents    Document[]
+  settlements  Settlement[]
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  plan                 String    @default("starter") // starter, small-fleet, growth-fleet, enterprise
+  status               String    @default("active") // active, trialing, past_due, canceled
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  trialEndsAt          DateTime?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Truck {
+  id            String    @id @default(cuid())
+  unitNumber    String
+  vin           String?
+  make          String?
+  model         String?
+  year          Int?
+  licensePlate  String?
+  status        String    @default("active") // active, maintenance, out-of-service
+  purchaseDate  DateTime?
+  purchasePrice Float?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  drivers      Driver[]
+  loads        Load[]
+  maintenance  MaintenanceRecord[]
+  fuelExpenses FuelExpense[]
+  documents    Document[]
+}
+
+model Driver {
+  id               String    @id @default(cuid())
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  cdlNumber        String?
+  cdlExpiration    DateTime?
+  hireDate         DateTime?
+  payType          String    @default("cpm") // cpm, percentage
+  payRate          Float     @default(0)
+  status           String    @default("active") // active, inactive, terminated
+  address          String?
+  emergencyContact String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  truckId String?
+  truck   Truck?  @relation(fields: [truckId], references: [id])
+
+  loads       Load[]
+  settlements Settlement[]
+  documents   Document[]
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  name         String
+  companyName  String?
+  email        String?
+  phone        String?
+  address      String?
+  paymentTerms String   @default("net30")
+  notes        String?
+  status       String   @default("active") // active, inactive
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  loads    Load[]
+  invoices Invoice[]
+}
+
+model Load {
+  id                  String    @id @default(cuid())
+  loadNumber          String
+  status              String    @default("pending") // pending, active, delivered, cancelled
+  pickupDate          DateTime?
+  deliveryDate        DateTime?
+  pickupLocation      String?
+  deliveryLocation    String?
+  commodity           String?
+  weight              Float?
+  rate                Float?
+  fuelCost            Float     @default(0)
+  brokerName          String?
+  brokerFee           Float     @default(0)
+  totalMiles          Float?
+  loadedMiles         Float?
+  notes               String?
+  rateConformationUrl String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  driverId String?
+  driver   Driver? @relation(fields: [driverId], references: [id])
+
+  truckId String?
+  truck   Truck?  @relation(fields: [truckId], references: [id])
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  invoices     Invoice[]
+  fuelExpenses FuelExpense[]
+}
+
+model Invoice {
+  id            String    @id @default(cuid())
+  invoiceNumber String
+  status        String    @default("pending") // pending, sent, paid, overdue
+  amount        Float
+  amountPaid    Float     @default(0)
+  issueDate     DateTime  @default(now())
+  dueDate       DateTime?
+  paidDate      DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  loadId String?
+  load   Load?   @relation(fields: [loadId], references: [id])
+}
+
+model FuelExpense {
+  id             String   @id @default(cuid())
+  date           DateTime @default(now())
+  amount         Float
+  cost           Float
+  pricePerGallon Float?
+  vendor         String?
+  location       String?
+  receiptUrl     String?
+  category       String   @default("diesel")
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  loadId String?
+  load   Load?   @relation(fields: [loadId], references: [id])
+
+  truckId String?
+  truck   Truck?  @relation(fields: [truckId], references: [id])
+}
+
+model MaintenanceRecord {
+  id          String    @id @default(cuid())
+  type        String    @default("other") // oil-change, tire, inspection, repair, other
+  description String
+  date        DateTime  @default(now())
+  cost        Float
+  vendor      String?
+  notes       String?
+  nextDueDate DateTime?
+  odometer    Int?
+  status      String    @default("completed") // scheduled, in-progress, completed
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  truckId String?
+  truck   Truck?  @relation(fields: [truckId], references: [id])
+}
+
+model Settlement {
+  id           String    @id @default(cuid())
+  periodStart  DateTime
+  periodEnd    DateTime
+  totalPay     Float
+  grossRevenue Float
+  deductions   Float     @default(0)
+  bonus        Float     @default(0)
+  status       String    @default("pending") // pending, paid
+  paidDate     DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  driverId String
+  driver   Driver @relation(fields: [driverId], references: [id])
+}
+
+model Document {
+  id         String    @id @default(cuid())
+  name       String
+  type       String    @default("other") // insurance, cdl, registration, permit, dot, other
+  fileUrl    String?
+  expiryDate DateTime?
+  notes      String?
+  uploadedAt DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  driverId String?
+  driver   Driver? @relation(fields: [driverId], references: [id])
+
+  truckId String?
+  truck   Truck?  @relation(fields: [truckId], references: [id])
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  email       String
+  name        String?
+  companyName String?
+  phone       String?
+  source      String   @default("website") // website, trial, demo, contact, newsletter
+  message     String?
+  status      String   @default("new") // new, contacted, qualified, converted, lost
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+}
+
+model BlogPost {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  content   String
+  excerpt   String?
+  imageUrl  String?
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  subject     String
+  description String
+  status      String   @default("open") // open, in-progress, resolved
+  priority    String   @default("normal") // low, normal, high, urgent
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+}
